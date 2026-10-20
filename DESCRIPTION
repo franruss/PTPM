@@ -1,0 +1,35 @@
+Package: PTPM
+Type: Package
+Title: Paired Transcriptomic Perturbation Modeling
+Version: 0.1.5
+Authors@R: person("Francesco", "Russo", role = c("aut", "cre"), email = "francesco.russo@cnr.it")
+Description: Protocol for estimating the predictability of a paired
+    transcriptomic perturbation phenotype from baseline profiles. It combines
+    patient-grouped nested cross-validation, fold-internal feature selection,
+    fold-internal adjustment for mathematical coupling between baseline
+    predictors and the paired outcome, a 2 x 2 decomposition of the
+    performance gap, patient-level bootstrap confidence intervals, and
+    sensitivity analyses on pathway scoring (training-reference GSVA,
+    ssGSEA), coupling and pathway circularity.
+License: GPL-3
+Encoding: UTF-8
+Depends: R (>= 4.1)
+Imports:
+    caret,
+    doParallel,
+    foreach,
+    glmnet,
+    GSVA,
+    msigdbr,
+    parallel,
+    stats,
+    utils
+Suggests:
+    Rcpp,
+    xgboost,
+    e1071,
+    mixOmics
+biocViews: GeneExpression, Transcriptomics, Regression
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.3
+

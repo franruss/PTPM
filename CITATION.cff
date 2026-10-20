@@ -1,0 +1,30 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata below."
+type: software
+title: "PTPM: Paired Transcriptomic Perturbation Modeling"
+abstract: >-
+  Protocol for estimating the predictability of a paired transcriptomic
+  perturbation phenotype from baseline profiles. It combines patient-grouped
+  nested cross-validation, fold-internal feature selection, fold-internal
+  adjustment for mathematical coupling between baseline predictors and the
+  paired outcome, a 2 x 2 decomposition of the performance gap,
+  patient-level bootstrap confidence intervals, and sensitivity analyses on
+  pathway scoring (training-reference GSVA, ssGSEA), coupling and pathway
+  circularity.
+authors:
+  - family-names: "Russo"
+    given-names: "Francesco"
+    email: "francesco.russo@cnr.it"
+    orcid: "https://orcid.org/0000-0002-7017-8344"
+version: "0.1.5"
+date-released: "2026-10-16"
+repository-code: "https://github.com/franruss/PTPM"
+license: GPL-3.0-only
+keywords:
+  - R
+  - transcriptomics
+  - gene expression
+  - nested cross-validation
+  - GSVA
+  - ssGSEA
+  - regression
