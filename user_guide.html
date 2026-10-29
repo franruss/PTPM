@@ -815,14 +815,15 @@ are identical to PTPM 0.1.4.</p>
 <div id="external-example-gse109756-cetuximab-head-and-neck-cancer" class="section level3">
 <h3>9.1 External example: GSE109756 (cetuximab, head and neck
 cancer)</h3>
-<p>GSE109756 (CHIRON window-of-opportunity study) profiles tumour
-biopsies taken at baseline and at surgery after about two weeks of
-cetuximab (Affymetrix HG-U133 Plus 2.0).
-<code>load_ptpm_geo(&quot;GSE109756&quot;)</code> (or its shortcut
-<code>load_ptpm_gse109756()</code>) downloads the series with
-<code>GEOquery</code>, keeps one probe per gene symbol and builds the
-<code>design</code> table. The patients without cetuximab (control arm),
-if present, are returned separately in <code>design_control</code>.</p>
+<p>[GEO] <a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE109756" class="uri">https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE109756</a>
+GSE109756 (CHIRON window-of-opportunity study) profiles tumour biopsies
+taken at baseline and at surgery after about two weeks of cetuximab
+(Affymetrix HG-U133 Plus 2.0). <code>load_ptpm_geo(&quot;GSE109756&quot;)</code>
+(or its shortcut <code>load_ptpm_gse109756()</code>) downloads the
+series with <code>GEOquery</code>, keeps one probe per gene symbol and
+builds the <code>design</code> table. The patients without cetuximab
+(control arm), if present, are returned separately in
+<code>design_control</code>.</p>
 <pre class="r"><code>if (!requireNamespace(&quot;GEOquery&quot;, quietly = TRUE)) BiocManager::install(&quot;GEOquery&quot;)
 
 geo &lt;- load_ptpm_geo(&quot;GSE109756&quot;)
@@ -878,7 +879,8 @@ the KRAS controls (<code>kras_set</code>) or switch the robustness block
 off (<code>robustness = FALSE</code>). S is always baseline minus
 treated score, so it is positive when the treatment suppresses the
 outcome gene sets.</p>
-<p>GSE20181 (neoadjuvant letrozole in breast cancer; biopsies before
+<p><a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE20181">GEO</a>
+GSE20181 (neoadjuvant letrozole in breast cancer; biopsies before
 treatment, after 10-14 days and after about 3 months) identifies the
 patient only by the number at the start of the title (“10A” = patient
 10, pretreatment; “10B” = patient 10, 10-14 days). The early time point
@@ -944,6 +946,113 @@ table(design$condition)
 res_108 &lt;- run_ptpm(expression = raw$expression, design = design,
                     top_k_values = c(300), k = 3, repeats = 2, n_boot = 2000,
                     seed = 123, n_cores = parallel::detectCores() - 1)</code></pre>
+</div>
+<div id="settings-used-in-the-manuscript" class="section level3">
+<h3>9.4 Settings used in the manuscript</h3>
+<p>The additional paired datasets reported in Supplementary Note S13
+were analysed with the commands of sections 9.1–9.3 and the manuscript
+settings (<code>repeats = 20</code>,
+<code>top_k_values = c(3000, 300)</code>). Because all three series are
+microarrays, the unsupervised expression filter of section 9.1 was
+applied to each of them before analysis; the filter does not use S. For
+GSE108277, whose models belong to the Candiolo collection, the overlap
+with the patients of the XENTURION discovery analysis is also
+reported.</p>
+<pre class="r"><code># Unsupervised expression filter (section 9.1), applied to all three series
+expr_filter &lt;- function(expr) {
+  ex   &lt;- as.matrix(expr[, -1])
+  keep &lt;- rowSums(ex &gt; quantile(ex, 0.25)) &gt;= 0.2 * ncol(ex)   # expressed in &gt;= 20% of arrays
+  expr[keep, ]
+}</code></pre>
+<p>GSE109756 (cetuximab, head and neck cancer):</p>
+<pre class="r"><code>geo_hn &lt;- load_ptpm_geo(&quot;GSE109756&quot;)
+geo_hn$samples   # check that patient and time point of every sample are correct
+
+res_hnscc &lt;- run_ptpm(
+  expression = expr_filter(geo_hn$expression),
+  design = geo_hn$design,
+  top_k_values = c(3000, 300),
+  k = 3, repeats = 20, n_boot = 2000, seed = 123,
+  n_cores = parallel::detectCores() - 1
+)
+res_hnscc$results_genome_wide
+res_hnscc$confidence_intervals
+res_hnscc$contrast_intervals
+res_hnscc$coupling_null</code></pre>
+<p>GSE20181 (neoadjuvant letrozole, breast cancer; 10–14 days):</p>
+<pre class="r"><code>raw_er &lt;- load_ptpm_geo(&quot;GSE20181&quot;, annotation_only = TRUE)   # expression + annotation
+ann &lt;- raw_er$samples
+design_er &lt;- data.frame(
+  sample    = ann$sample,
+  pair      = sub(&quot;^(\\d+)[A-Z].*&quot;, &quot;\\1&quot;, ann$title),                   # patient number
+  condition = ifelse(grepl(&quot;pretreatment&quot;, ann$title), &quot;baseline&quot;,
+              ifelse(grepl(&quot;10-14 days&quot;, ann$title), &quot;treated&quot;, NA))    # 3-month samples left out
+)
+design_er &lt;- design_er[!is.na(design_er$condition), ]
+table(design_er$condition)
+
+h &lt;- msigdbr::msigdbr(species = &quot;Homo sapiens&quot;, collection = &quot;H&quot;)  # category = &quot;H&quot; in msigdbr &lt; 10
+er_sets &lt;- split(h$gene_symbol, h$gs_name)[c(&quot;HALLMARK_ESTROGEN_RESPONSE_EARLY&quot;,
+                                             &quot;HALLMARK_ESTROGEN_RESPONSE_LATE&quot;,
+                                             &quot;HALLMARK_E2F_TARGETS&quot;)]
+
+# robustness = FALSE: the KRAS controls do not apply to endocrine therapy, so the
+# pathway-specific adjustment is not computed for this series
+res_er &lt;- run_ptpm(
+  expression = expr_filter(raw_er$expression),
+  design = design_er, gene_sets = er_sets, robustness = FALSE,
+  top_k_values = c(3000, 300),
+  k = 3, repeats = 20, n_boot = 2000, seed = 123,
+  n_cores = parallel::detectCores() - 1
+)
+res_er$results_genome_wide
+res_er$confidence_intervals
+res_er$contrast_intervals
+res_er$coupling_null</code></pre>
+<p>GSE108277 (cetuximab 72 h, CRC PDX, Candiolo collection):</p>
+<pre class="r"><code>raw_108 &lt;- load_ptpm_geo(&quot;GSE108277&quot;, annotation_only = TRUE)   # expression + annotation
+s &lt;- raw_108$samples
+s
+table(s$`treatment:ch1`)
+table(sub(&quot;^\\S+\\s*&quot;, &quot;&quot;, s$title))      # title suffixes: &quot;&quot;, PHI, 24H, 48H, 72H
+
+design_108 &lt;- data.frame(
+  sample    = s$sample,
+  pair      = substr(s$title, 1, 12),
+  condition = ifelse(s$`treatment:ch1` == &quot;NT&quot;, &quot;baseline&quot;,
+              ifelse(s$`treatment:ch1` == &quot;chronic&quot;, &quot;treated&quot;, NA)),
+  patient   = s$`patient id:ch1`
+)
+design_108 &lt;- design_108[!is.na(design_108$condition), ]
+table(design_108$condition)
+
+# Overlap with the XENTURION discovery patients.
+# Uses the result of section 4 if available; otherwise a quick run, since the
+# paired models do not depend on the number of repeats or bootstrap resamples.
+if (file.exists(&quot;ptpm_genome_wide.rds&quot;)) {
+  genome_wide &lt;- readRDS(&quot;ptpm_genome_wide.rds&quot;)
+} else {
+  example_data &lt;- load_ptpm_example()
+  genome_wide &lt;- run_ptpm(
+    expression = example_data$expression,
+    metadata = example_data$metadata,
+    top_k_values = 300, repeats = 2, n_boot = 200,
+    gsva_sensitivity = FALSE, ssgsea_sensitivity = FALSE, robustness = FALSE,
+    n_perm_coupling = 100, seed = 123,
+    n_cores = parallel::detectCores() - 1
+  )
+}
+disc_ids &lt;- unique(substr(names(genome_wide$y), 1, 7))
+length(disc_ids)                                                     # 72
+length(intersect(unique(substr(design_108$patient, 1, 7)), disc_ids))
+
+res_108 &lt;- run_ptpm(expression = expr_filter(raw_108$expression), design = design_108,
+                    top_k_values = c(3000, 300), k = 3, repeats = 20, n_boot = 2000,
+                    seed = 123, n_cores = parallel::detectCores() - 1)
+res_108$results_genome_wide
+res_108$confidence_intervals
+res_108$contrast_intervals
+res_108$coupling_null</code></pre>
 </div>
 </div>
 <div id="notes" class="section level2">

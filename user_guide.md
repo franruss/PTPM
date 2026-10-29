@@ -362,6 +362,7 @@ to the XENTURION data. With `design = NULL` the XENTURION parsing of
 
 ### 9.1 External example: GSE109756 (cetuximab, head and neck cancer)
 
+[GEO] https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE109756
 GSE109756 (CHIRON window-of-opportunity study) profiles tumour biopsies taken
 at baseline and at surgery after about two weeks of cetuximab (Affymetrix
 HG-U133 Plus 2.0). `load_ptpm_geo("GSE109756")` (or its shortcut
@@ -434,6 +435,7 @@ pass the relevant gene sets and either name the set used by the KRAS controls
 S is always baseline minus treated score, so it is positive when the
 treatment suppresses the outcome gene sets.
 
+[GEO](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE20181)
 GSE20181 (neoadjuvant letrozole in breast cancer; biopsies before treatment,
 after 10-14 days and after about 3 months) identifies the patient only by the
 number at the start of the title ("10A" = patient 10, pretreatment; "10B" =
@@ -512,6 +514,126 @@ table(design$condition)
 res_108 <- run_ptpm(expression = raw$expression, design = design,
                     top_k_values = c(300), k = 3, repeats = 2, n_boot = 2000,
                     seed = 123, n_cores = parallel::detectCores() - 1)
+```
+
+### 9.4 Settings used in the manuscript
+
+The additional paired datasets reported in Supplementary Note S13 were analysed
+with the commands of sections 9.1–9.3 and the manuscript settings
+(`repeats = 20`, `top_k_values = c(3000, 300)`). Because all three series are
+microarrays, the unsupervised expression filter of section 9.1 was applied to
+each of them before analysis; the filter does not use S. For GSE108277, whose
+models belong to the Candiolo collection, the overlap with the patients of the
+XENTURION discovery analysis is also reported.
+
+```r
+# Unsupervised expression filter (section 9.1), applied to all three series
+expr_filter <- function(expr) {
+  ex   <- as.matrix(expr[, -1])
+  keep <- rowSums(ex > quantile(ex, 0.25)) >= 0.2 * ncol(ex)   # expressed in >= 20% of arrays
+  expr[keep, ]
+}
+```
+
+GSE109756 (cetuximab, head and neck cancer):
+
+```r
+geo_hn <- load_ptpm_geo("GSE109756")
+geo_hn$samples   # check that patient and time point of every sample are correct
+
+res_hnscc <- run_ptpm(
+  expression = expr_filter(geo_hn$expression),
+  design = geo_hn$design,
+  top_k_values = c(3000, 300),
+  k = 3, repeats = 20, n_boot = 2000, seed = 123,
+  n_cores = parallel::detectCores() - 1
+)
+res_hnscc$results_genome_wide
+res_hnscc$confidence_intervals
+res_hnscc$contrast_intervals
+res_hnscc$coupling_null
+```
+
+GSE20181 (neoadjuvant letrozole, breast cancer; 10–14 days):
+
+```r
+raw_er <- load_ptpm_geo("GSE20181", annotation_only = TRUE)   # expression + annotation
+ann <- raw_er$samples
+design_er <- data.frame(
+  sample    = ann$sample,
+  pair      = sub("^(\\d+)[A-Z].*", "\\1", ann$title),                   # patient number
+  condition = ifelse(grepl("pretreatment", ann$title), "baseline",
+              ifelse(grepl("10-14 days", ann$title), "treated", NA))    # 3-month samples left out
+)
+design_er <- design_er[!is.na(design_er$condition), ]
+table(design_er$condition)
+
+h <- msigdbr::msigdbr(species = "Homo sapiens", collection = "H")  # category = "H" in msigdbr < 10
+er_sets <- split(h$gene_symbol, h$gs_name)[c("HALLMARK_ESTROGEN_RESPONSE_EARLY",
+                                             "HALLMARK_ESTROGEN_RESPONSE_LATE",
+                                             "HALLMARK_E2F_TARGETS")]
+
+# robustness = FALSE: the KRAS controls do not apply to endocrine therapy, so the
+# pathway-specific adjustment is not computed for this series
+res_er <- run_ptpm(
+  expression = expr_filter(raw_er$expression),
+  design = design_er, gene_sets = er_sets, robustness = FALSE,
+  top_k_values = c(3000, 300),
+  k = 3, repeats = 20, n_boot = 2000, seed = 123,
+  n_cores = parallel::detectCores() - 1
+)
+res_er$results_genome_wide
+res_er$confidence_intervals
+res_er$contrast_intervals
+res_er$coupling_null
+```
+
+GSE108277 (cetuximab 72 h, CRC PDX, Candiolo collection):
+
+```r
+raw_108 <- load_ptpm_geo("GSE108277", annotation_only = TRUE)   # expression + annotation
+s <- raw_108$samples
+s
+table(s$`treatment:ch1`)
+table(sub("^\\S+\\s*", "", s$title))      # title suffixes: "", PHI, 24H, 48H, 72H
+
+design_108 <- data.frame(
+  sample    = s$sample,
+  pair      = substr(s$title, 1, 12),
+  condition = ifelse(s$`treatment:ch1` == "NT", "baseline",
+              ifelse(s$`treatment:ch1` == "chronic", "treated", NA)),
+  patient   = s$`patient id:ch1`
+)
+design_108 <- design_108[!is.na(design_108$condition), ]
+table(design_108$condition)
+
+# Overlap with the XENTURION discovery patients.
+# Uses the result of section 4 if available; otherwise a quick run, since the
+# paired models do not depend on the number of repeats or bootstrap resamples.
+if (file.exists("ptpm_genome_wide.rds")) {
+  genome_wide <- readRDS("ptpm_genome_wide.rds")
+} else {
+  example_data <- load_ptpm_example()
+  genome_wide <- run_ptpm(
+    expression = example_data$expression,
+    metadata = example_data$metadata,
+    top_k_values = 300, repeats = 2, n_boot = 200,
+    gsva_sensitivity = FALSE, ssgsea_sensitivity = FALSE, robustness = FALSE,
+    n_perm_coupling = 100, seed = 123,
+    n_cores = parallel::detectCores() - 1
+  )
+}
+disc_ids <- unique(substr(names(genome_wide$y), 1, 7))
+length(disc_ids)                                                     # 72
+length(intersect(unique(substr(design_108$patient, 1, 7)), disc_ids))
+
+res_108 <- run_ptpm(expression = expr_filter(raw_108$expression), design = design_108,
+                    top_k_values = c(3000, 300), k = 3, repeats = 20, n_boot = 2000,
+                    seed = 123, n_cores = parallel::detectCores() - 1)
+res_108$results_genome_wide
+res_108$confidence_intervals
+res_108$contrast_intervals
+res_108$coupling_null
 ```
 
 ## Notes
