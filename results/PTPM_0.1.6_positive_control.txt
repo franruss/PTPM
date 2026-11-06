@@ -1,0 +1,97 @@
+============================================================
+PTPM analysis
+============================================================
+top_k_values      : 3000, 300 
+feature ranking   : correlation (supervised; positive control) 
+outer folds       : 3  x repeats: 20 = 60 splits
+inner folds       : 5 (grouped by patient)
+regimes           : 4 (FS position x coupling correction)
+GSVA sensitivity  : off 
+pairing null      : off 
+seed / cores      : 123 / 39 
+============================================================
+
+Input mode: legacy | gene prefix 'H_' 
+Paired models: 106  | patients (groups): 72 
+Generated 60 outer train/test splits (caret::groupKFold).
+Starting parallel backend with 39 cores...
+
+-- Regime: standard | FS pre-CV | coupling correction no 
+ K_300 K_3000 
+0.6475 0.6173 
+
+-- Regime: coupling_adjusted | FS pre-CV | coupling correction yes 
+ K_300 K_3000 
+0.4394 0.3637 
+
+-- Regime: fold_internal | FS inside folds | coupling correction no 
+ K_300 K_3000 
+0.4408 0.4261 
+
+-- Regime: fully_controlled | FS inside folds | coupling correction yes 
+ K_300 K_3000 
+0.2230 0.2324 
+
+-- Patient-level bootstrap: 2000 resamples...
+
+============================================================
+FINAL RESULTS (R² = mean of 20 per-repeat R², each 1 - SSE/SST on that repeat's out-of-fold predictions)
+============================================================
+                  Model Standard R² Coupling-adjusted R² Fold-internal R² Fully controlled R²
+K_3000 fit_reg (K=3000)      0.6173               0.3637           0.4261              0.2324
+K_300   fit_reg (K=300)      0.6475               0.4394           0.4408              0.2230
+
+R² with 95% intervals (boot = patient-level bootstrap; nb = corrected resampled t):
+            regime    K     R2 boot_lower boot_upper boot_se nb_mean nb_lower nb_upper
+          standard 3000 0.6173     0.4782     0.7063  0.0589  0.5748   0.3390   0.8107
+          standard  300 0.6475     0.5234     0.7262  0.0534  0.6123   0.4002   0.8245
+ coupling_adjusted 3000 0.3637    -0.0638     0.6011  0.1749  0.2904  -0.3435   0.9244
+ coupling_adjusted  300 0.4394     0.2944     0.5469  0.0649  0.3938   0.0641   0.7235
+     fold_internal 3000 0.4261     0.2838     0.5099  0.0572  0.3798   0.1139   0.6456
+     fold_internal  300 0.4408     0.2883     0.5261  0.0589  0.3914   0.0600   0.7228
+  fully_controlled 3000 0.2324     0.0577     0.3654  0.0786  0.1539  -0.1336   0.4415
+  fully_controlled  300 0.2230     0.0548     0.3509  0.0768  0.1444  -0.3072   0.5959
+
+Contrasts between regimes with 95% intervals:
+                   contrast    K estimate boot_lower boot_upper boot_se boot_prop_positive nb_mean nb_lower nb_upper   nb_p
+   Delta_FS_no_coupling_adj 3000   0.1911     0.1428     0.2400  0.0248             1.0000  0.1951   0.0877   0.3024 0.0006
+   Delta_FS_no_coupling_adj  300   0.2068     0.1719     0.2535  0.0204             1.0000  0.2209   0.0294   0.4125 0.0245
+ Delta_FS_with_coupling_adj 3000   0.1313    -0.2778     0.3557  0.1730             0.7820  0.1365  -0.5060   0.7790 0.6723
+ Delta_FS_with_coupling_adj  300   0.2164     0.1337     0.3160  0.0471             1.0000  0.2494  -0.2284   0.7273 0.3006
+    Delta_coupling_FS_preCV 3000   0.2536     0.0000     0.6476  0.1680             0.9750  0.2844  -0.4074   0.9762 0.4141
+    Delta_coupling_FS_preCV  300   0.2081     0.0646     0.3442  0.0703             0.9960  0.2186  -0.1651   0.6022 0.2589
+   Delta_coupling_FS_inside 3000   0.1938     0.0290     0.3613  0.0854             0.9895  0.2258  -0.0897   0.5413 0.1573
+   Delta_coupling_FS_inside  300   0.2178     0.0366     0.3953  0.0920             0.9900  0.2470  -0.2715   0.7656 0.3444
+                Interaction 3000   0.0598    -0.1647     0.4362  0.1655             0.6135  0.0586  -0.5753   0.6924 0.8540
+                Interaction  300  -0.0097    -0.1109     0.0859  0.0504             0.4065 -0.0285  -0.5183   0.4613 0.9078
+           Delta_FS_shapley 3000   0.1612    -0.0568     0.2859  0.0918             0.9465  0.1658  -0.1685   0.5001 0.3251
+           Delta_FS_shapley  300   0.2116     0.1673     0.2665  0.0261             1.0000  0.2352  -0.0342   0.5045 0.0858
+     Delta_coupling_shapley 3000   0.2237     0.0305     0.4529  0.1044             0.9920  0.2551  -0.1792   0.6894 0.2446
+     Delta_coupling_shapley  300   0.2130     0.0586     0.3641  0.0779             0.9935  0.2328  -0.1520   0.6176 0.2309
+                  Total_gap 3000   0.3849     0.2274     0.5523  0.0829             1.0000  0.4209   0.1086   0.7331 0.0091
+                  Total_gap  300   0.4246     0.2733     0.5856  0.0817             1.0000  0.4680   0.0051   0.9308 0.0476
+
+Coupling null, cor(b, S):
+ r_observed r_null_mean r_null_q025 r_null_q975 n_perm
+     0.6189      0.6697      0.5892       0.742   1000
+
+Definition - fully controlled:
+  Every data-dependent step that could carry information about a held-out patient (outer and inner splits, gene ranking, hyperparameters, coupling regression) is estimated on training patients only. Exception: GSVA scores defining S and b are computed on the whole cohort (unsupervised); their influence is quantified by the training-reference GSVA sensitivity analysis. 
+> pc$contrast_intervals   # Delta_FS_shapley: atteso grande e positivo
+                     contrast    K     estimate    boot_lower boot_upper    boot_se boot_prop_positive     nb_mean     nb_lower  nb_upper         nb_p
+1    Delta_FS_no_coupling_adj 3000  0.191133726  1.427785e-01 0.24003124 0.02479294             1.0000  0.19505075  0.087717583 0.3023839 0.0005822731
+2    Delta_FS_no_coupling_adj  300  0.206760349  1.719358e-01 0.25352585 0.02044158             1.0000  0.22094769  0.029410990 0.4124844 0.0245083376
+3  Delta_FS_with_coupling_adj 3000  0.131323784 -2.777502e-01 0.35574141 0.17298190             0.7820  0.13649612 -0.506042375 0.7790346 0.6723271604
+4  Delta_FS_with_coupling_adj  300  0.216442037  1.336745e-01 0.31596380 0.04707256             1.0000  0.24941460 -0.228444647 0.7272739 0.3005594871
+5     Delta_coupling_FS_preCV 3000  0.253561059  3.448541e-05 0.64764738 0.16799783             0.9750  0.28438077 -0.407412838 0.9761744 0.4140680492
+6     Delta_coupling_FS_preCV  300  0.208126359  6.457578e-02 0.34418715 0.07034721             0.9960  0.21855428 -0.165072387 0.6021810 0.2589021251
+7    Delta_coupling_FS_inside 3000  0.193751118  2.900453e-02 0.36128635 0.08535453             0.9895  0.22582615 -0.089662128 0.5413144 0.1573321301
+8    Delta_coupling_FS_inside  300  0.217808046  3.664371e-02 0.39527312 0.09198013             0.9900  0.24702120 -0.271526143 0.7655685 0.3443690757
+9                 Interaction 3000  0.059809942 -1.646731e-01 0.43617244 0.16552326             0.6135  0.05855463 -0.575274908 0.6923842 0.8539755276
+10                Interaction  300 -0.009681688 -1.109422e-01 0.08586734 0.05042261             0.4065 -0.02846692 -0.518257857 0.4613240 0.9078105834
+11           Delta_FS_shapley 3000  0.161228755 -5.680718e-02 0.28589836 0.09175634             0.9465  0.16577343 -0.168521484 0.5000683 0.3251164793
+12           Delta_FS_shapley  300  0.211601193  1.673037e-01 0.26651792 0.02610042             1.0000  0.23518115 -0.034158962 0.5045213 0.0858025849
+13     Delta_coupling_shapley 3000  0.223656088  3.049413e-02 0.45293669 0.10442627             0.9920  0.25510346 -0.179201336 0.6894083 0.2445755039
+14     Delta_coupling_shapley  300  0.212967202  5.857991e-02 0.36410917 0.07790332             0.9935  0.23278774 -0.151993486 0.6175690 0.2308850153
+15                  Total_gap 3000  0.384884843  2.273656e-01 0.55226948 0.08290935             1.0000  0.42087689  0.108621253 0.7331325 0.0091047695
+16                  Total_gap  300  0.424568396  2.732992e-01 0.58558944 0.08165911             1.0000  0.46796888  0.005140746 0.9307970 0.0475885461

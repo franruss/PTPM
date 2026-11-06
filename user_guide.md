@@ -41,10 +41,10 @@ about 0.001 reflect the numerical tolerance of the solver.
 
 ## 1. Install
 
-From the directory containing `PTPM_0.1.5.tar.gz`:
+From the directory containing `PTPM_0.1.6.tar.gz`:
 
 ```r
-install.packages("PTPM_0.1.5.tar.gz", repos = NULL, type = "source")
+install.packages("PTPM_0.1.6.tar.gz", repos = NULL, type = "source")
 ```
 
 Required packages: `glmnet`, `caret`, `GSVA`, `msigdbr`, `foreach`, `doParallel`.
@@ -205,6 +205,16 @@ results$hybrid$predictor_pathways                   # pathways always included
 results$hybrid$predictor_gene_pool                  # EGFR-axis gene pool
 results$hybrid_interaction$predictor_pathways       # pathways and interaction terms always included
 results$hybrid_interaction$pathway_overlap
+```
+
+### 6.1 Positive control for leakage
+
+```r
+pc <- run_ptpm(expression = example_data$expression, metadata = example_data$metadata,
+               top_k_values = c(3000, 300), fs_method = "correlation",
+               k = 3, repeats = 20, n_boot = 2000, seed = 123,
+               n_cores = parallel::detectCores() - 1)
+pc$contrast_intervals 
 ```
 
 ## 7. Inspect predictions

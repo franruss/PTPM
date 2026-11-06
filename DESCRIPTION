@@ -1,7 +1,7 @@
 Package: PTPM
 Type: Package
 Title: Paired Transcriptomic Perturbation Modeling
-Version: 0.1.5
+Version: 0.1.6
 Authors@R: person("Francesco", "Russo", role = c("aut", "cre"), email = "francesco.russo@cnr.it")
 Description: Protocol for estimating the predictability of a paired
     transcriptomic perturbation phenotype from baseline profiles. It combines
@@ -25,6 +25,12 @@ Imports:
     stats,
     utils
 Suggests:
+    Rcpp,
+    xgboost,
+    e1071,
+    mixOmics,
+    Biobase,
+    GEOquery,
     Rcpp,
     xgboost,
     e1071,

@@ -11,7 +11,14 @@ a paired perturbation phenotype without optimism from feature-selection
 leakage or mathematical coupling. Six functions apply the same protocol to
 different predictor or outcome models: \code{\link[=run_ptpm]{run_ptpm()}}, \code{\link[=run_ptpm_egfr]{run_ptpm_egfr()}},
 \code{\link[=run_ptpm_pathways]{run_ptpm_pathways()}}, \code{\link[=run_ptpm_weighted_score]{run_ptpm_weighted_score()}}, \code{\link[=run_ptpm_hybrid]{run_ptpm_hybrid()}} and
-\code{\link[=run_ptpm_hybrid_interactions]{run_ptpm_hybrid_interactions()}}.
+\code{\link[=run_ptpm_hybrid_interactions]{run_ptpm_hybrid_interactions()}}. \code{\link[=run_ptpm_benchmark]{run_ptpm_benchmark()}} re-evaluates the
+genome-wide model with alternative learners on the same folds.
+}
+\details{
+The functions accept any dataset with a baseline and a treated expression
+profile per paired unit through the \code{design} argument. \code{\link[=load_ptpm_example]{load_ptpm_example()}}
+loads the XENTURION example data (GSE204805), and \code{\link[=load_ptpm_geo]{load_ptpm_geo()}} /
+\code{\link[=load_ptpm_gse109756]{load_ptpm_gse109756()}} prepare paired GEO microarray series.
 }
 \author{
 \strong{Maintainer}: Francesco Russo \email{francesco.russo@cnr.it}

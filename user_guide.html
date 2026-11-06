@@ -454,8 +454,8 @@ construction. Residual differences of about 0.001 reflect the numerical
 tolerance of the solver.</p>
 <div id="install" class="section level2">
 <h2>1. Install</h2>
-<p>From the directory containing <code>PTPM_0.1.5.tar.gz</code>:</p>
-<pre class="r"><code>install.packages(&quot;PTPM_0.1.5.tar.gz&quot;, repos = NULL, type = &quot;source&quot;)</code></pre>
+<p>From the directory containing <code>PTPM_0.1.6.tar.gz</code>:</p>
+<pre class="r"><code>install.packages(&quot;PTPM_0.1.6.tar.gz&quot;, repos = NULL, type = &quot;source&quot;)</code></pre>
 <p>Required packages: <code>glmnet</code>, <code>caret</code>,
 <code>GSVA</code>, <code>msigdbr</code>, <code>foreach</code>,
 <code>doParallel</code>. <code>msigdbr</code> is also used to retrieve
@@ -616,6 +616,14 @@ results$hybrid$predictor_pathways                   # pathways always included
 results$hybrid$predictor_gene_pool                  # EGFR-axis gene pool
 results$hybrid_interaction$predictor_pathways       # pathways and interaction terms always included
 results$hybrid_interaction$pathway_overlap</code></pre>
+<div id="positive-control-for-leakage" class="section level3">
+<h3>6.1 Positive control for leakage</h3>
+<pre class="r"><code>pc &lt;- run_ptpm(expression = example_data$expression, metadata = example_data$metadata,
+               top_k_values = c(3000, 300), fs_method = &quot;correlation&quot;,
+               k = 3, repeats = 20, n_boot = 2000, seed = 123,
+               n_cores = parallel::detectCores() - 1)
+pc$contrast_intervals </code></pre>
+</div>
 </div>
 <div id="inspect-predictions" class="section level2">
 <h2>7. Inspect predictions</h2>

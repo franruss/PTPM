@@ -162,8 +162,17 @@
 #'   the XENTURION example and no prefix with `design`; use `""` for none.
 #' @param gene_sets Optional named list of gene sets. If `NULL`, the three
 #'   Hallmark sets of the original PTPM analysis are retrieved with `msigdbr`.
-#' @param top_k_values Integer vector with the numbers of highest-variance
+#' @param top_k_values Integer vector with the numbers of top-ranked
 #'   baseline genes evaluated in the elastic-net models.
+#' @param fs_method Gene ranking used for feature selection. `"variance"`
+#'   (default, unsupervised: highest baseline variance, never uses the
+#'   outcome) or `"correlation"` (supervised: highest absolute correlation
+#'   with the outcome; with coupling adjustment, with the residualised
+#'   outcome). `"correlation"` is a positive control for feature-selection
+#'   leakage: ranked on the full dataset it uses the outcome of the held-out
+#'   patients, whereas inside the folds it uses training patients only. With
+#'   `"correlation"` the sensitivity, robustness and pairing-null blocks are
+#'   switched off, because they assume the unsupervised ranking.
 #' @param k Number of outer grouped folds.
 #' @param repeats Number of repeated outer cross-validation runs.
 #' @param n_inner Number of inner grouped folds used for tuning (>= 3).
@@ -209,6 +218,7 @@ run_ptpm <- function(
     balanced_folds = NULL,
     gene_sets = NULL,
     top_k_values = c(3000, 300),
+    fs_method = c("variance", "correlation"),
     k = 3,
     repeats = 20,
     n_inner = 5,
@@ -279,6 +289,18 @@ run_ptpm <- function(
   if (!is.numeric(alpha_grid) || any(alpha_grid < 0 | alpha_grid > 1)) {
     stop("'alpha_grid' must contain values in [0, 1].")
   }
+  fs_method <- match.arg(fs_method)
+  if (fs_method == "correlation") {
+    # Positive-control mode: the downstream blocks assume variance ranking
+    if (gsva_sensitivity || robustness || ssgsea_sensitivity || n_perm > 0) {
+      message("fs_method = \"correlation\" (positive control for leakage): ",
+              "GSVA sensitivity, robustness, ssGSEA and pairing-null blocks switched off.")
+    }
+    gsva_sensitivity <- FALSE
+    robustness <- FALSE
+    ssgsea_sensitivity <- FALSE
+    n_perm <- 0
+  }
 
   for (pkg in c("glmnet", "caret", "msigdbr", "GSVA", "foreach", "doParallel")) {
     if (!requireNamespace(pkg, quietly = TRUE)) stop("Package '", pkg, "' is required.")
@@ -289,6 +311,8 @@ run_ptpm <- function(
   cat("PTPM analysis\n")
   cat("============================================================\n")
   cat("top_k_values      :", paste(top_k_values, collapse = ", "), "\n")
+  cat("feature ranking   :", fs_method,
+      if (fs_method == "correlation") "(supervised; positive control)" else "(unsupervised)", "\n")
   cat("outer folds       :", k, " x repeats:", repeats, "=", k * repeats, "splits\n")
   cat("inner folds       :", n_inner, "(grouped by patient)\n")
   cat("regimes           : 4 (FS position x coupling correction)\n")
@@ -447,21 +471,33 @@ run_ptpm <- function(
 
   # 16. GLOBAL (PRE-CV) FEATURE RANKING ---------------------------------
   # Used only by the two regimes with FS before CV (full dataset, all patients).
-  global_vars <- apply(x_baseline_matrix, 2, stats::var)
-  global_gene_order <- names(sort(global_vars, decreasing = TRUE))
+  # With fs_method = "correlation" the outcome of ALL patients is used here,
+  # which is the leakage the positive control is meant to reveal. Two orders:
+  # one for the unadjusted outcome S and one for the residual of S on b
+  # (regression fitted on the full dataset, as in a pre-CV analysis).
+  if (fs_method == "variance") {
+    global_vars <- apply(x_baseline_matrix, 2, stats::var)
+    global_gene_order <- names(sort(global_vars, decreasing = TRUE))
+    global_gene_order_resid <- global_gene_order
+  } else {
+    cor_order <- function(x, y) {
+      sc <- suppressWarnings(abs(stats::cor(x, y))[, 1])
+      sc[is.na(sc)] <- 0
+      names(sort(sc, decreasing = TRUE))
+    }
+    resid_full <- stats::lm.fit(cbind(1, as.matrix(b_main)), y_main)$residuals
+    global_gene_order <- cor_order(x_baseline_matrix, y_main)
+    global_gene_order_resid <- cor_order(x_baseline_matrix, resid_full)
+  }
 
   # 17. CORE FOLD FIT ----------------------------------------------------
   # Environment set to globalenv so that workers do not receive a copy of
   # the whole run_ptpm frame (expression matrix) when the function is exported.
   fit_fold <- function(x_train, x_test, y_train, y_test, b_train, b_test,
                        fs_inside, global_gene_order, coupling_correct,
-                       top_k_values, alpha_grid, inner_foldid) {
-    if (fs_inside) {
-      v <- apply(x_train, 2, stats::var)
-      gene_order <- names(sort(v, decreasing = TRUE))
-    } else {
-      gene_order <- global_gene_order
-    }
+                       top_k_values, alpha_grid, inner_foldid,
+                       fs_method = "variance",
+                       global_gene_order_resid = global_gene_order) {
     # OLS coefficients of y on [1, B]; B is a vector (mean baseline score)
     # or a matrix (one column per baseline pathway score)
     ols <- function(B1, y) {
@@ -477,6 +513,21 @@ run_ptpm <- function(
       cf <- ols(Btr, y_train)
       r_train <- as.numeric(y_train - Btr %*% cf)
       r_test <- as.numeric(y_test - Bte %*% cf)
+    }
+    # Gene ranking. Inside the folds it uses the outer training fold only;
+    # the supervised ranking uses the training outcome (S, or its residual
+    # computed with the training-fold coupling regression).
+    if (fs_inside) {
+      if (fs_method == "variance") {
+        sc <- apply(x_train, 2, stats::var)
+      } else {
+        y_rank <- if (coupling_correct) r_train else y_train
+        sc <- suppressWarnings(abs(stats::cor(x_train, y_rank))[, 1])
+        sc[is.na(sc)] <- 0
+      }
+      gene_order <- names(sort(sc, decreasing = TRUE))
+    } else {
+      gene_order <- if (coupling_correct) global_gene_order_resid else global_gene_order
     }
     pred <- matrix(NA_real_, nrow(x_test), length(top_k_values))
     for (j in seq_along(top_k_values)) {
@@ -578,6 +629,8 @@ run_ptpm <- function(
     folds <- folds
     fit_fold <- fit_fold
     global_gene_order <- global_gene_order
+    global_gene_order_resid <- global_gene_order_resid
+    fs_method <- fs_method
     top_k_values <- top_k_values
     alpha_grid <- alpha_grid
     inner_foldid_list <- inner_foldid_list
@@ -594,7 +647,8 @@ run_ptpm <- function(
       res <- fit_fold(x_full[tr, , drop = FALSE], x_full[te, , drop = FALSE],
                       yv[tr], yv[te], b_tr, b_te,
                       fs_inside, global_gene_order, coupling_correct,
-                      top_k_values, alpha_grid, inner_foldid_list[[i]])
+                      top_k_values, alpha_grid, inner_foldid_list[[i]],
+                      fs_method, global_gene_order_resid)
       list(fold = i, pred = res$pred, obs = res$obs)
     }
   }
@@ -1277,7 +1331,8 @@ run_ptpm <- function(
                          "inner CV only", "outer and inner training folds", "global (whole cohort)"),
     note = c("",
              "inner folds built on patients of the outer training set",
-             "variance ranking is unsupervised (does not use S)",
+             if (fs_method == "variance") "variance ranking is unsupervised (does not use S)" else
+               "supervised ranking (|cor| with S or its residual); pre-CV regimes use held-out outcomes (positive control)",
              "",
              "re-estimated within each inner training fold during tuning",
              "unsupervised, transductive; see gsva_sensitivity (training-reference GSVA)"),
@@ -1396,6 +1451,8 @@ run_ptpm <- function(
     R2_fully_controlled = stats::setNames(mean_r2("fully_controlled"), paste0("K_", top_k_values)),
     fold_results = fold_results,
     global_gene_order = global_gene_order,
+    global_gene_order_resid = global_gene_order_resid,
+    fs_method = fs_method,
     x_baseline = x_baseline_matrix,
     folds = folds,
     inner_foldid = inner_foldid_list,

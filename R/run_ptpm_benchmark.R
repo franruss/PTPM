@@ -120,6 +120,9 @@ run_ptpm_benchmark <- function(
   }
   y <- unname(y)
   b <- unname(b)
+  if (!is.null(ptpm$fs_method) && ptpm$fs_method != "variance") {
+    stop("run_ptpm_benchmark() requires a run_ptpm() result with fs_method = \"variance\".")
+  }
   global_gene_order <- ptpm$global_gene_order
   if (!identical(names(sort(apply(x, 2, stats::var), decreasing = TRUE)), global_gene_order)) {
     stop("'x' does not reproduce ptpm$global_gene_order: it is not the matrix used by run_ptpm().")

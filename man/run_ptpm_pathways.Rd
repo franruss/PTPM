@@ -6,7 +6,12 @@
 \usage{
 run_ptpm_pathways(
   expression = NULL,
-  metadata,
+  metadata = NULL,
+  design = NULL,
+  baseline_label = "baseline",
+  treated_label = "treated",
+  gene_prefix = NULL,
+  balanced_folds = NULL,
   gene_sets = NULL,
   top_k_values = NULL,
   predictor_gene_sets = NULL,
@@ -39,7 +44,30 @@ run_ptpm_pathways(
 column contains gene identifiers and the remaining columns are samples.}
 
 \item{metadata}{Data frame containing a \code{title} column with the sample
-identifiers/titles used to derive treatment and pair information.}
+identifiers/titles used to derive treatment and pair information. Used
+only for the XENTURION example data (\code{design = NULL}).}
+
+\item{design}{Data frame describing the samples of any paired dataset (see
+INPUT FOR OTHER DATASETS). Columns: \code{sample} (expression column name),
+\code{pair} (paired unit: model, tumour or subject), \code{condition} (values
+\code{baseline_label} or \code{treated_label}; other values are ignored) and,
+optionally, \code{patient} (grouping of the cross-validation; defaults to
+\code{pair}). If \code{NULL}, pairs are parsed from \code{metadata$title} as in the
+XENTURION example.}
+
+\item{baseline_label, treated_label}{Values of \code{design$condition} that
+identify the baseline and the treated profile of each pair.}
+
+\item{gene_prefix}{Prefix that marks the human genes in the expression
+identifiers (removed before scoring). \code{NULL} (default) means \code{"H_"} for
+the XENTURION example and no prefix with \code{design}; use \code{""} for none.}
+
+\item{balanced_folds}{Logical; build the outer folds by dealing the
+shuffled patients to the k folds in turn, so that every fold has the same
+number of patients (+/- 1). \code{NULL} (default) means \code{TRUE} with \code{design}
+and \code{FALSE} for the XENTURION example, where \code{caret::groupKFold()} is kept
+to reproduce the published results (it samples fold labels with
+replacement, so fold sizes vary and a fold can be empty in small cohorts).}
 
 \item{gene_sets}{Optional named list of the OUTCOME gene sets. If \code{NULL},
 the three Hallmark sets of the original PTPM analysis are retrieved with
@@ -268,5 +296,19 @@ The fold-internal and fully controlled regimes are re-run on S_perm. The
 null R2 of the fold-internal regime is the predictability expected from
 coupling alone; under the null the fully controlled R2 should be near 0.
 A cheap null of cor(b, S) with n_perm_coupling permutations is always run.
+}
+
+\subsection{INPUT FOR OTHER DATASETS}{
+
+Any dataset with a baseline and a treated expression profile for each
+paired unit can be analysed by passing \code{design}. Expression must be on a
+log-like scale (e.g. log2 microarray intensities or variance-stabilised
+counts) with gene symbols as identifiers. Replicate samples of the same
+pair and condition are averaged; pairs without both profiles are excluded.
+The suppression phenotype is S = baseline score - treated score, so for a
+treatment that activates the outcome gene sets S is negative. The default
+outcome gene sets are those of the anti-EGFR analysis; supply \code{gene_sets}
+(and \code{kras_set}, or set \code{robustness = FALSE}) for other treatments.
+Internally, baseline and treated profiles are labelled "NT" and "CET".
 }
 }

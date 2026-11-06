@@ -1,0 +1,6 @@
+^LICENSE$
+^CITATION\.cff$
+^results$
+^user_guide\.(md|html)$
+^Supplementary_File_.*\.R$
+^[^/]+\.txt$

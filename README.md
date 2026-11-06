@@ -1,7 +1,7 @@
 # PTPM: Paired Transcriptomic Perturbation Modeling
 
 [![License: GPL-3](https://img.shields.io/badge/License-GPL--3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-![Version](https://img.shields.io/badge/version-0.1.5-informational)
+![Version](https://img.shields.io/badge/version-0.1.6-informational)
 
 **PTPM** is an R package implementing a protocol for estimating the
 predictability of a paired transcriptomic perturbation phenotype from
@@ -49,14 +49,14 @@ help(package = "PTPM")
 If you use PTPM in your work, please cite:
 
 > Russo, F. (2026). *PTPM: Paired Transcriptomic Perturbation Modeling*
-> (Version 0.1.5) [R package]. Zenodo.
+> (Version 0.1.6) [R package]. Zenodo.
 
 ```bibtex
 @software{russo_ptpm_2026,
   author    = {Russo, Francesco},
   title     = {PTPM: Paired Transcriptomic Perturbation Modeling},
   year      = {2026},
-  version   = {0.1.5},
+  version   = {0.1.6},
   publisher = {Zenodo}
 }
 ```
