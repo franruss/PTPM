@@ -16,8 +16,8 @@ authors:
     given-names: "Francesco"
     email: "francesco.russo@cnr.it"
     orcid: "https://orcid.org/0000-0002-7017-8344"
-version: "0.1.5"
-date-released: "2026-10-16"
+version: "0.1.6"
+date-released: "2026-11-09"
 repository-code: "https://github.com/franruss/PTPM"
 license: GPL-3.0-only
 keywords:
