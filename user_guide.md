@@ -216,6 +216,74 @@ pc <- run_ptpm(expression = example_data$expression, metadata = example_data$met
                n_cores = parallel::detectCores() - 1)
 pc$contrast_intervals 
 ```
+### 6.2 R² on the scale of S and Oldham's test
+
+In the coupling-adjusted regimes, R² refers to the variance of the
+residualised outcome, so it is not on the same scale as the R² of the
+unadjusted regimes. The out-of-fold predictions of the fully controlled
+regime can be expressed on the scale of S by adding back the training-fold
+coupling regression. In `fold_results`, `obs` is the test residual
+R = S − β̂₀ − β̂₁b, with β̂ estimated on the outer training fold, so:
+
+- S − R is the prediction from baseline pathway activity alone;
+- S − R + R̂ is the prediction from baseline pathway activity plus the
+  baseline predictors.
+
+The difference between the two R² values (incremental R²) is the fraction
+of the variance of S explained by the baseline predictors beyond baseline
+pathway activity, which enters S by construction.
+
+Oldham's test complements the pairing null of section 6: the correlation
+between change (b − c) and the mean of the baseline and post-treatment
+scores ((b + c) / 2) assesses whether change depends on the initial value
+without the mathematical coupling between b and S.
+
+Both analyses reuse the stored out-of-fold predictions and refit no model.
+The script `results/PTPM_0.1.6_scale_of_S_and_Oldham.R` reads the `.rds`
+files saved in section 4 (and, if present, `ptpm_positive_control.rds`
+from section 6.1) and reproduces Supplementary Table S2.2, the incremental
+R² column of Table 1 and Oldham's test:
+
+```r
+source("results/PTPM_0.1.6_scale_of_S_and_Oldham.R")
+```
+
+The core function can also be applied to a single result:
+
+```r
+r2 <- function(o, p) 1 - sum((o - p)^2) / sum((o - mean(o))^2)
+
+s_scale_rows <- function(x, regime = "fully_controlled", K = 3000) {
+  j <- match(K, x$top_k_values); n <- length(x$y)
+  do.call(rbind, lapply(x$fold_results[[regime]], function(z) {
+    te    <- setdiff(seq_len(n), x$folds[[z$fold]])
+    S     <- unname(x$y[te])
+    fit_b <- S - z$obs                    # coupling regression of the training fold
+    data.frame(rep = as.integer(sub(".*_Rep", "", names(x$folds)[z$fold])),
+               patient = x$groups[te], S = S,
+               b_only = fit_b, b_plus_X = fit_b + z$pred[, j])
+  }))
+}
+
+d <- s_scale_rows(readRDS("ptpm_genome_wide.rds"), K = 3000)
+res <- t(sapply(split(d, d$rep), function(z)
+  c(b_only = r2(z$S, z$b_only), b_plus_X = r2(z$S, z$b_plus_X))))
+colMeans(res)                                   # R² on S, mean over 20 repeats
+mean(res[, "b_plus_X"] - res[, "b_only"])       # incremental R²
+
+gw <- readRDS("ptpm_genome_wide.rds")
+cor.test(gw$baseline_score - gw$cet_score,      # Oldham's test
+         (gw$baseline_score + gw$cet_score) / 2)
+```
+
+The baseline-only R² is identical across the six functions, because folds
+and coupling regression are shared. `run_ptpm_weighted_score()` is not
+supported: its outcome is rescaled within each training fold, so
+out-of-fold predictions are not on a common scale. Oldham's test treats the
+paired models as independent; the script also reports a patient-level
+bootstrap interval, because several models can derive from the same
+patient.
+
 
 ## 7. Inspect predictions
 
