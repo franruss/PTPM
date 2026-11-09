@@ -214,6 +214,7 @@ pc <- run_ptpm(expression = example_data$expression, metadata = example_data$met
                top_k_values = c(3000, 300), fs_method = "correlation",
                k = 3, repeats = 20, n_boot = 2000, seed = 123,
                n_cores = parallel::detectCores() - 1)
+saveRDS(pc, "ptpm_positive_control.rds")
 pc$contrast_intervals 
 ```
 ### 6.2 R² on the scale of S and Oldham's test
@@ -562,29 +563,30 @@ res <- run_ptpm(expression = raw$expression, design = my_design, gene_sets = er_
 ### 9.3 Several models per patient: GSE108277 (cetuximab, CRC PDX)
 
 GSE108277 ([GEO](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE108277))
-profiles colorectal cancer PDX models untreated (NT) and after 24, 48 and
-72 hours of cetuximab (Illumina HumanHT-12 v4). A patient can have more than
-one PDX model, so the paired unit is the model and the cross-validation is
-grouped by patient, as in the XENTURION analysis. The design is written by
-hand; the 72-hour time point is used here.
+profiles colorectal cancer PDX models untreated (NT), after 24, 48 and 72 hours
+of cetuximab, and after chronic in vivo treatment (Illumina HumanHT-12 v4).
+A patient can have more than one PDX model, so the paired unit is the model and
+the cross-validation is grouped by patient, as in the XENTURION analysis. The
+design is written by hand. The chronic arm is used here, because the 72-hour arm
+has only 8 complete pairs, too few for nested cross-validation; the choice is
+based on sample size, not on results.
 
 The models belong to the Candiolo PDX collection, which is also the source of
 the XENTURION data, so this series is a sensitivity analysis on another
-platform and time point rather than an independent validation.
-
+platform and treatment schedule rather than an independent validation.
 ```r
 raw <- load_ptpm_geo("GSE108277", annotation_only = TRUE)   # expression + annotation
 s <- raw$samples
 
 table(s$`treatment:ch1`)
-table(sub("^\\S+\\s*", "", s$title))      # title suffixes: "", PHI, 24H, 48H, 72H
+table(sub("^\\S+\\s*", "", s$title))      # title suffixes (time points)
 
 design <- data.frame(
   sample    = s$sample,
-  pair      = substr(s$title, 1, 12),                  # PDX model, e.g. CRC0096LMX0a
+  pair      = substr(s$title, 1, 12),
   condition = ifelse(s$`treatment:ch1` == "NT", "baseline",
-              ifelse(grepl("72H", s$title), "treated", NA)),
-  patient   = s$`patient id:ch1`                       # CV grouped by patient
+              ifelse(s$`treatment:ch1` == "chronic", "treated", NA)),
+  patient   = s$`patient id:ch1`
 )
 design <- design[!is.na(design$condition), ]
 table(design$condition)

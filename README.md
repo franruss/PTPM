@@ -40,9 +40,25 @@ remotes::install_github("franruss/PTPM")
 ```r
 library(PTPM)
 
-# List the documented functions of the package
-help(package = "PTPM")
+# XENTURION example data (downloaded from GEO on first use, ~206 MB)
+example_data <- load_ptpm_example()
+
+# Quick run: 2 repeats, sensitivity analyses off (a few minutes)
+res <- run_ptpm(
+  expression = example_data$expression,
+  metadata   = example_data$metadata,
+  top_k_values = c(3000, 300),
+  repeats = 2, n_boot = 200,
+  gsva_sensitivity = FALSE, ssgsea_sensitivity = FALSE, robustness = FALSE,
+  n_perm_coupling = 100, seed = 123
+)
+
+res$results_genome_wide    # R² of the four regimes for each K
+res$confidence_intervals   # with patient-bootstrap 95% CI
 ```
+
+The settings of the manuscript (`repeats = 20`, `n_boot = 2000`, all
+sensitivity analyses on) and the other five models are described in the user_guide.md.
 
 ## Citation
 
